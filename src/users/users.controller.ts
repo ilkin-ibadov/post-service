@@ -8,6 +8,7 @@ import { Role } from "src/common/enums/role.enum";
 import { UserResponseDto } from "./dto/user-response.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { CreateUserDto } from "./dto/create-user.dto";
+import { ApiParam } from "@nestjs/swagger";
 
 @ApiTags("Users")
 @ApiBearerAuth()
@@ -23,8 +24,14 @@ export class UsersController {
     }
 
     @Roles(Role.ADMIN)
+    @ApiParam({
+        name: 'email',
+        required: true,
+        type: String,
+        description: 'Email of the user to retrieve'
+    })
     @Get(':email')
-    findByEmail(@Param() email: string): Promise<UserResponseDto> {
+    findByEmail(@Param('email') email: string): Promise<UserResponseDto> {
         return this.service.findByEmail(email)
     }
 
