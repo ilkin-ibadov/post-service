@@ -35,7 +35,7 @@ export class TodosService {
 
   // Find a single todo by ID
   async findById(id: string): Promise<Todo> {
-    const todo = await this.model.findById(id).exec();
+    const todo = await this.model.findById(id).populate('userId').exec();
     if (!todo) {
       throw new NotFoundException(`Todo with id ${id} not found`);
     }

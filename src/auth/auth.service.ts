@@ -64,7 +64,6 @@ export class AuthService {
     }
 
     async refresh(user: any) {
-        console.log(user)
         const { id, refreshToken: incomingToken } = user
 
         const dbUser = await this.usersService.findById(id)

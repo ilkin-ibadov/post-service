@@ -39,7 +39,7 @@ export class UsersService {
     }
 
     async findByEmailRaw(email: string): Promise<UserDocument | null> {
-        const user = await this.model.findOne({ email }).exec();
+        const user = await this.model.findOne({ email })
         if (!user) {
             throw new NotFoundException('User not found');
         }
