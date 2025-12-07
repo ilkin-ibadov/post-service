@@ -1,9 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { MongoModule } from "./modules/mongo/mongo.module"
-import { AuthModule } from "./modules/auth/auth.module"
-import { UserModule } from "./modules/user/user.module"
-import { MailModule } from "./modules/mail/mail.module"
+import { PostModule } from './modules/post/post.module';
 import { RedisModule } from "./modules/redis/redis.module"
 import { KafkaModule } from "./modules/kafka/kafka.module"
 import { ConfigModule } from '@nestjs/config';
@@ -16,10 +14,8 @@ import { typeOrmConfig } from "./ormconfig"
       isGlobal: true,
     }),
     MongooseModule.forRoot(process.env.MONGO_URI!),
-    AuthModule,
-    UserModule,
+    PostModule,
     MongoModule,
-    MailModule,
     RedisModule,
     KafkaModule,
     TypeOrmModule.forRoot(typeOrmConfig),

@@ -1,8 +1,5 @@
 import { DataSourceOptions } from "typeorm";
-import { User } from "./modules/user/user.entity"
-import { EmailVerification } from "./modules/user/email-verification.entity"
-import { PasswordReset } from "./modules/user/password-reset.entity"
-import { UserSession } from "./modules/user/session.entity"
+import { Post } from "./modules/post/post.entity";
 
 export const typeOrmConfig: DataSourceOptions = {
     type: "postgres",
@@ -10,8 +7,8 @@ export const typeOrmConfig: DataSourceOptions = {
     port: Number(process.env.DB_PORT) || 5432,
     username: process.env.DB_USERNAME || "postgres",
     password: process.env.DB_PASSWORD || "postgres",
-    database: process.env.DB_NAME || "auth-service",
-    entities: [User, EmailVerification, PasswordReset, UserSession],
+    database: process.env.DB_NAME || "posts-service",
+    entities: [Post],
     synchronize: true,
-    logging: false
-}
+    logging: false,
+};

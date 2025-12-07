@@ -42,27 +42,31 @@ services:
       - mongodata:/data/db
     restart: unless-stopped
 
-  auth:
-    build: .
+  posts:
+    build: ./posts
     env_file:
-      - .env 
+      - ./posts/.env
     environment:
       - NODE_ENV=development
       - DATABASE_HOST=postgres
       - DATABASE_PORT=5432
       - DATABASE_USER=postgres
       - DATABASE_PASSWORD=postgres
-      - DATABASE_NAME=postgres
+      - DATABASE_NAME=posts
       - KAFKA_BROKERS=kafka:9092
+      - REDIS_HOST=redis
+      - MONGO_URI=mongodb://mongo:27017/posts
+      - AUTH_SERVICE_URL=http://auth:3000
     ports:
-      - "3000:3000"
+      - "3001:3000"
     depends_on:
       - postgres
       - redis
       - kafka
       - mongo
+      - auth
     volumes:
-      - ./:/usr/src/app
+      - ./posts:/usr/src/app
     working_dir: /usr/src/app
     command: npm run start:dev
     restart: unless-stopped

@@ -14,8 +14,8 @@ async function bootstrap() {
   }))
 
   const config = new DocumentBuilder()
-    .setTitle("Auth service")
-    .setDescription("Auth service for social media")
+    .setTitle("Post service API")
+    .setDescription("API documentation for the Post microservice")
     .setVersion("1.0")
     .addBearerAuth()
     .build()
