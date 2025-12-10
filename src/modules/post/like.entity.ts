@@ -15,3 +15,5 @@ export class PostLike {
   @CreateDateColumn()
   createdAt: Date;
 }
+
+// FOREIGN KEY (postId) REFERENCES posts(id) ON DELETE CASCADE

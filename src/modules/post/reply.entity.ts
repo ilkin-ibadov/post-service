@@ -40,3 +40,5 @@ export class PostReply {
   @DeleteDateColumn()
   deletedAt: Date;
 }
+
+// FOREIGN KEY (postId) REFERENCES posts(id) ON DELETE CASCADE

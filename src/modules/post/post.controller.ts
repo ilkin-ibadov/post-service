@@ -8,6 +8,7 @@ import {
   Delete,
   Query,
   Patch,
+  UseGuards
 } from '@nestjs/common';
 import { PostService } from './post.service';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -22,7 +23,9 @@ import {
   ApiNotFoundResponse,
 } from '@nestjs/swagger';
 import { Post as PostEntity } from './post.entity';
+import { JwtAuthGuard } from '../../middlewares/auth.guard';
 
+@UseGuards(JwtAuthGuard)
 @ApiTags('Posts')
 @Controller('posts')
 export class PostController {
