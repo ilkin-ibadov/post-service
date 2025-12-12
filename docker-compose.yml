@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/18/main
     restart: unless-stopped
@@ -43,9 +43,9 @@ services:
     restart: unless-stopped
 
   posts:
-    build: ./posts
+    build: .
     env_file:
-      - ./posts/.env
+      - ./.env
     environment:
       - NODE_ENV=development
       - DATABASE_HOST=postgres
@@ -64,9 +64,8 @@ services:
       - redis
       - kafka
       - mongo
-      - auth
     volumes:
-      - ./posts:/usr/src/app
+      - ./:/usr/src/app
     working_dir: /usr/src/app
     command: npm run start:dev
     restart: unless-stopped

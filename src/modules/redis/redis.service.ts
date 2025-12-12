@@ -27,4 +27,16 @@ export class RedisService {
         const val = await this.redis.rpop(key);
         return val ? JSON.parse(val) : null;
     }
+
+    async incr(key: string) {
+        return this.redis.incr(key);
+    }
+
+    async decr(key: string) {
+        return this.redis.decr(key);
+    }
+
+    async del(key: string) {
+        return this.redis.del(key);
+    }
 }
