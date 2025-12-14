@@ -1,44 +1,37 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  CreateDateColumn,
-  UpdateDateColumn,
-  DeleteDateColumn
-} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, DeleteDateColumn, Unique } from "typeorm";
 
-@Entity('post_replies')
-export class PostReply {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
-  @Column('uuid')
-  postId: string; // parent post
-
-  @Column('uuid')
-  userId: string;
-
-  @Column({ type: 'text' })
-  content: string;
-
-  @Column({ type: 'jsonb', nullable: true })
-  mediaItems: Array<{
+export type MediaItemType = Array<{
     mediaId: string;
     url: string;
     type: 'image' | 'video';
-  }>;
+}>
 
-  @Column('uuid', { array: true, default: [] })
-  mentions: string[];
+@Entity('post_replies')
+export class PostReply {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
-  @CreateDateColumn()
-  createdAt: Date;
+    @Column('uuid')
+    postId: string;
 
-  @UpdateDateColumn()
-  updatedAt: Date;
+    @Column('uuid')
+    userId: string;
 
-  @DeleteDateColumn()
-  deletedAt: Date;
+    @Column('text')
+    content: string
+
+    @Column({ type: 'jsonb', nullable: true })
+    mediaItems: MediaItemType;
+
+    @Column('uuid', { array: true, default: [] })
+    mentions: string[];
+
+    @CreateDateColumn()
+    createdAt: Date
+
+    @UpdateDateColumn()
+    updatedAt: Date
+
+    @DeleteDateColumn()
+    deletedAt: Date
 }
-
-// FOREIGN KEY (postId) REFERENCES posts(id) ON DELETE CASCADE

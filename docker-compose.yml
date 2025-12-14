@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/18/main
     restart: unless-stopped
@@ -15,7 +15,7 @@ services:
     image: redis:7-alpine
     command: ["redis-server", "--save", "60", "1", "--appendonly", "yes"]
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redisdata:/data
     restart: unless-stopped
@@ -32,7 +32,7 @@ services:
      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     ports:
-      - "9092:9092"
+      - "9093:9092"
 
   mongo:
     image: mongo:6
@@ -43,9 +43,9 @@ services:
     restart: unless-stopped
 
   posts:
-    build: ./posts
+    build: .
     env_file:
-      - ./posts/.env
+      - ./.env
     environment:
       - NODE_ENV=development
       - DATABASE_HOST=postgres
@@ -64,9 +64,8 @@ services:
       - redis
       - kafka
       - mongo
-      - auth
     volumes:
-      - ./posts:/usr/src/app
+      - ./:/usr/src/app
     working_dir: /usr/src/app
     command: npm run start:dev
     restart: unless-stopped

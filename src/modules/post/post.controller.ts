@@ -23,6 +23,9 @@ import {
   ApiNotFoundResponse,
 } from '@nestjs/swagger';
 import { Post as PostEntity } from './post.entity';
+import { PostLike } from './like.entity';
+import { PostReply } from './reply.entity';
+import { CreateReplyDto } from './dto/create-reply.dto';
 import { JwtAuthGuard } from '../../middlewares/auth.guard';
 
 @UseGuards(JwtAuthGuard)
@@ -39,7 +42,7 @@ export class PostController {
     type: PostEntity,
   })
   @ApiBadRequestResponse({ description: 'Validation failed.' })
-  async create(@Req() req, @Body() dto: CreatePostDto) {
+  create(@Req() req, @Body() dto: CreatePostDto) {
     return this.postService.create(req.user.id, dto);
   }
 
@@ -47,7 +50,7 @@ export class PostController {
   @ApiOperation({ summary: 'Get a post by ID' })
   @ApiOkResponse({ description: 'The post.', type: PostEntity })
   @ApiNotFoundResponse({ description: 'Post not found.' })
-  async getById(@Param('id') id: string) {
+  getById(@Param('id') id: string) {
     return this.postService.findById(id);
   }
 
@@ -56,7 +59,10 @@ export class PostController {
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @ApiOkResponse({ description: 'List of posts.', type: [PostEntity] })
-  async getAll(@Query('page') page = 1, @Query('limit') limit = 10) {
+  getAll(
+    @Query('page') page = 1,
+    @Query('limit') limit = 10
+  ) {
     const pageNum = Number(page) || 1;
     const limitNum = Number(limit) || 10;
     return this.postService.findAll(pageNum, limitNum);
@@ -70,7 +76,7 @@ export class PostController {
   })
   @ApiNotFoundResponse({ description: 'Post not found.' })
   @ApiBadRequestResponse({ description: 'Validation failed.' })
-  async update(@Param('id') id: string, @Req() req, @Body() dto: UpdatePostDto) {
+  update(@Param('id') id: string, @Req() req, @Body() dto: UpdatePostDto) {
     return this.postService.update(id, req.user.id, dto);
   }
 
@@ -78,45 +84,41 @@ export class PostController {
   @ApiOperation({ summary: 'Delete a post' })
   @ApiOkResponse({ description: 'Post deleted successfully.' })
   @ApiNotFoundResponse({ description: 'Post not found.' })
-  async delete(@Param('id') id: string, @Req() req) {
+  delete(@Param('id') id: string, @Req() req) {
     return this.postService.delete(id, req.user.id);
   }
 
-  @Post(':id/like')
+
+  @Post(":id/like")
   @ApiOperation({ summary: 'Like a post' })
-  @ApiOkResponse({ description: 'Post liked successfully.' })
-  @ApiNotFoundResponse({ description: 'Post not found.' })
-  async likePost(@Param('id') id: string, @Req() req) {
-    return this.postService.likePost(id, req.user.id);
+  @ApiOkResponse({ description: 'Post liked successfully', type: PostLike })
+  @ApiNotFoundResponse({ description: 'Post not found' })
+  likePost(@Param('id') id: string, @Req() req) {
+    return this.postService.likePost(id, req.user.id)
   }
 
-  @Delete(':id/unlike')
+  @Post(":id/unlike")
   @ApiOperation({ summary: 'Unlike a post' })
-  @ApiOkResponse({ description: 'Post unliked successfully.' })
-  @ApiNotFoundResponse({ description: 'Post not found.' })
-  async unlikePost(@Param('id') id: string, @Req() req) {
-    return this.postService.unlikePost(id, req.user.id);
+  @ApiOkResponse({ description: 'Post unliked successfully', type: PostLike })
+  @ApiNotFoundResponse({ description: 'Post not found' })
+  unlikePost(@Param('id') id: string, @Req() req) {
+    return this.postService.unlikePost(id, req.user.id)
   }
 
-  @Post(':id/reply')
+  @Post(":id/reply")
   @ApiOperation({ summary: 'Reply to a post' })
-  @ApiOkResponse({ description: 'Reply created successfully.' })
-  @ApiBadRequestResponse({ description: 'Validation failed.' })
-  async reply(
-    @Param('id') parentId: string,
-    @Req() req,
-    @Body() dto: CreatePostDto,
-  ) {
-    return this.postService.reply(parentId, req.user.id, dto);
+  @ApiOkResponse({ description: 'Reply created successfully', type: PostReply })
+  @ApiNotFoundResponse({ description: 'Post not found' })
+  @ApiBadRequestResponse({ description: 'Validation failed' })
+  reply(@Param('id') id: string, @Req() req, @Body() dto: CreateReplyDto) {
+    return this.postService.reply(id, req.user.id, dto)
   }
 
   @Get(':id/replies')
   @ApiOperation({ summary: 'Get all replies of a post' })
-  @ApiOkResponse({
-    description: 'List of replies.',
-    type: [PostEntity],
-  })
-  async getReplies(@Param('id') id: string) {
-    return this.postService.getReplies(id);
+  @ApiOkResponse({ description: 'List of replies', type: [PostReply] })
+  @ApiNotFoundResponse({ description: 'Post not found' })
+  getReplies(@Param('id') id: string) {
+    return this.postService.getReplies(id)
   }
 }

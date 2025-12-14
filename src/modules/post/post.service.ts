@@ -7,42 +7,38 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { extractMentions } from '../../utils/mention.util';
-import axios from 'axios';
-import { KafkaProducerService } from '../kafka/kafka.service';
+import { KafkaService } from '../kafka/kafka.service';
 import { MongoService } from '../mongo/mongo.service';
 import { RedisService } from '../redis/redis.service';
+import { CreateReplyDto } from './dto/create-reply.dto';
+import { UserReplicaService } from '../user-replica/user-replica.service';
 
 @Injectable()
 export class PostService {
   constructor(
     @InjectRepository(Post)
     private readonly postRepo: Repository<Post>,
+
+    @InjectRepository(PostLike)
     private readonly likeRepo: Repository<PostLike>,
+
+    @InjectRepository(PostReply)
     private readonly replyRepo: Repository<PostReply>,
-    private readonly kafka: KafkaProducerService,
+    private readonly kafka: KafkaService,
     private readonly mongoService: MongoService,
     private readonly redisService: RedisService,
+    private readonly userReplicaService: UserReplicaService,
   ) { }
 
+  async resolveMentionsLocally(usernames: string[]) {
+    const users = await this.userReplicaService.findManyByUsername(usernames);
+    return users.map((user) => user.id);
+  }
+
   async create(userId: string, dto: CreatePostDto) {
-    // 1. Extract @mentions
     const usernames = extractMentions(dto.content);
+    const mentionUserIds = await this.userReplicaService.resolveMentionsLocally(usernames);
 
-    // 2. Resolve usernames → userIds via Auth microservice
-    let mentionUserIds: string[] = [];
-    if (usernames.length > 0) {
-      try {
-        const res = await axios.get(
-          `${process.env.AUTH_SERVICE_URL}/internal/users/resolve-mentions`,
-          { params: { usernames } },
-        );
-        mentionUserIds = res.data.userIds;
-      } catch (e) {
-        throw new BadRequestException('Failed to resolve mentions');
-      }
-    }
-
-    // 3. Save post
     const post = this.postRepo.create({
       userId,
       content: dto.content,
@@ -51,22 +47,18 @@ export class PostService {
     });
     const saved = await this.postRepo.save(post);
 
-    // 4. Cache the post
     await this.redisService.set(`post:${saved.id}`, saved, 3600);
 
-    // 5. Emit Kafka events
     await this.kafka.produce('post.created', {
       postId: saved.id,
       userId: saved.userId,
     });
 
-    // 6. Log to Mongo
     await this.mongoService.log('info', 'Post created', {
       postId: saved.id,
       userId: saved.userId,
     });
 
-    // 7. Emit mention events
     for (const mentionedUserId of mentionUserIds) {
       await this.kafka.produce('post.mention.created', {
         postId: saved.id,
@@ -180,17 +172,9 @@ export class PostService {
     return { unliked: true };
   }
 
-  async reply(postId: string, userId: string, dto: CreatePostDto) {
+  async reply(postId: string, userId: string, dto: CreateReplyDto) {
     const usernames = extractMentions(dto.content);
-
-    let mentionUserIds: string[] = [];
-    if (usernames.length > 0) {
-      const res = await axios.get(
-        `${process.env.AUTH_SERVICE_URL}/internal/users/resolve-mentions`,
-        { params: { usernames } }
-      );
-      mentionUserIds = res.data.userIds;
-    }
+    const mentionUserIds = await this.userReplicaService.resolveMentionsLocally(usernames);
 
     const reply = this.replyRepo.create({
       postId,
@@ -221,5 +205,4 @@ export class PostService {
 
     return replies;
   }
-
 }
