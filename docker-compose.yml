@@ -9,7 +9,7 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - post_pgdata:/var/lib/postgresql/data
+      - post_pgdata:/var/lib/postgresql
     networks:
       - microservices
 
@@ -20,7 +20,7 @@ services:
       - .env
     environment:
       NODE_ENV: development
-      DATABASE_HOST: postgres
+      DATABASE_HOST: post-postgres
       DATABASE_PORT: 5432
       DATABASE_USER: postgres
       DATABASE_PASSWORD: postgres
@@ -37,7 +37,7 @@ services:
       - microservices
     volumes:
       - ./:/usr/src/app
-    command: npm run start:dev
+    command: sh -c './wait-for.sh post-postgres:5432 npm run start:dev'
 
 networks:
   microservices:
