@@ -8,12 +8,13 @@ import { PostService } from './post.service';
 import { PostController } from './post.controller';
 import { KafkaService } from '../kafka/kafka.service'
 import { UserReplicaService } from '../user-replica/user-replica.service';
-import { UserReplicaConsumer } from '../user-replica/user-replica.consumer';
+import { UserReplicaConsumer } from '../kafka/consumers/user-replica.consumer';
 import { RedisService } from '../redis/redis.service';
 import { MongoService } from '../mongo/mongo.service';
+import { IdempotencyModule } from '../kafka/idempotency/idempotency.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Post, PostLike, PostReply, UserReplica])],
+  imports: [TypeOrmModule.forFeature([Post, PostLike, PostReply, UserReplica]), IdempotencyModule],
   controllers: [PostController],
   providers: [
     PostService,
@@ -21,7 +22,7 @@ import { MongoService } from '../mongo/mongo.service';
     UserReplicaService,
     UserReplicaConsumer,
     RedisService,
-    MongoService,
+    MongoService
   ],
 })
 export class PostModule { }

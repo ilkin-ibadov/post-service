@@ -21,6 +21,12 @@ export class Post {
   @Column('uuid', { array: true, default: [] })
   mentions: string[];
 
+  @Column({ type: "integer", default: 0 })
+  likeCount: number
+
+  @Column({ type: "integer", default: 0 })
+  replyCount: number
+
   @CreateDateColumn()
   createdAt: Date;
 

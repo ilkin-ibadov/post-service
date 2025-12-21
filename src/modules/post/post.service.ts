@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Post } from './post.entity';
 import { PostLike } from './like.entity';
 import { PostReply } from './reply.entity';
@@ -24,10 +24,12 @@ export class PostService {
 
     @InjectRepository(PostReply)
     private readonly replyRepo: Repository<PostReply>,
+
     private readonly kafka: KafkaService,
     private readonly mongoService: MongoService,
     private readonly redisService: RedisService,
     private readonly userReplicaService: UserReplicaService,
+    private readonly dataSource: DataSource, // needed for transactions
   ) { }
 
   async resolveMentionsLocally(usernames: string[]) {
@@ -71,7 +73,6 @@ export class PostService {
   }
 
   async findById(id: string) {
-    // Try Redis cache first
     const cached = await this.redisService.get(`post:${id}`);
     if (cached) return cached;
 
@@ -83,130 +84,149 @@ export class PostService {
   async findAll(page = 1, limit = 10) {
     const skip = (page - 1) * limit;
 
-    // Try caching the feed page
-    // const cacheKey = `posts:page:${page}:limit:${limit}`;
-    // const cached = await this.redisService.get(cacheKey);
-    // if (cached) return cached;
-
-    const allPosts = await this.postRepo.find()
-
+    // Fetch posts from DB
     const [posts, total] = await this.postRepo.findAndCount({
       skip,
       take: limit,
       order: { createdAt: 'DESC' },
     });
 
-    // console.log(posts)
+    // Preload likeCount and replyCount from Redis
+    const postsWithCounts = await Promise.all(posts.map(async (post) => {
+      const likeCount = await this.redisService.get(`post:${post.id}:likeCount`);
+      const replyCount = await this.redisService.get(`post:${post.id}:replyCount`);
 
-    const result = {
-      data: posts,
+      return {
+        ...post,
+        likeCount: likeCount !== null ? Number(likeCount) : post.likeCount,
+        replyCount: replyCount !== null ? Number(replyCount) : post.replyCount,
+      };
+    }));
+
+    return {
+      data: postsWithCounts,
       meta: {
         total,
         page,
         lastPage: Math.ceil(total / limit),
       },
     };
-
-    // await this.redisService.set(cacheKey, result, 300); // cache feed for 5 min
-    return { data: allPosts };
   }
+
 
   async update(id: string, userId: string, dto: UpdatePostDto) {
     const post = await this.findById(id);
-    if (!post) throw new BadRequestException('Post not found');
+    if (!post) throw new NotFoundException('Post not found');
     if (post.userId !== userId) throw new ForbiddenException('Cannot edit others post');
 
     Object.assign(post, dto);
     const updated = await this.postRepo.save(post);
 
-    // Update cache
     await this.redisService.set(`post:${id}`, updated, 3600);
-
-    // Log update
-    await this.mongoService.log('info', 'Post updated', {
-      postId: updated.id,
-      userId: updated.userId,
-    });
-
+    await this.mongoService.log('info', 'Post updated', { postId: updated.id, userId });
     return updated;
   }
 
   async delete(postId: string, userId: string) {
     const post = await this.postRepo.findOne({ where: { id: postId } });
     if (!post) throw new NotFoundException('Post not found');
-    if (post.userId !== userId) throw new BadRequestException('Unauthorized');
+    if (post.userId !== userId) throw new ForbiddenException('You cannot delete this post');
 
     await this.postRepo.softDelete(postId);
-
-    // Remove cache
-    await this.redisService.set(`post:${postId}`, null, 1);
-
-    // Emit Kafka
+    await this.redisService.del(`post:${postId}`);
     await this.kafka.produce('post.deleted', { postId, userId });
-
-    // Log deletion
-    await this.mongoService.log('info', 'Post deleted', {
-      postId,
-      userId,
-    });
+    await this.mongoService.log('info', 'Post deleted', { postId, userId });
 
     return { deleted: true };
   }
 
+  // --- Atomic like/unlike using transaction ---
   async likePost(postId: string, userId: string) {
-    const exists = await this.likeRepo.findOne({ where: { postId, userId } });
-    if (exists) throw new BadRequestException('Already liked');
+    return this.dataSource.transaction(async (manager) => {
+      const post = await manager.findOne(Post, { where: { id: postId } });
+      if (!post) throw new NotFoundException('Post not found');
 
-    const like = this.likeRepo.create({ postId, userId });
-    await this.likeRepo.save(like);
+      const exists = await manager.findOne(PostLike, { where: { postId, userId } });
+      if (exists) throw new BadRequestException('Already liked');
 
-    await this.redisService.incr(`post:${postId}:likes`);
+      await manager.insert(PostLike, { postId, userId });
+      await manager.increment(Post, { id: postId }, 'likeCount', 1);
 
-    await this.kafka.produce('post.liked', { postId, userId });
+      // Update Redis atomically after DB transaction
+      await this.redisService.set(`post:${postId}:likeCount`, post.likeCount + 1);
 
-    return { liked: true };
+      await this.kafka.produce('post.liked', { postId, userId });
+      return { liked: true };
+    });
   }
 
   async unlikePost(postId: string, userId: string) {
-    await this.likeRepo.delete({ postId, userId });
-    await this.redisService.decr(`post:${postId}:likes`);
+    return this.dataSource.transaction(async (manager) => {
+      const post = await manager.findOne(Post, { where: { id: postId } });
+      if (!post) throw new NotFoundException('Post not found');
 
-    await this.kafka.produce('post.unliked', { postId, userId });
+      const deleted = await manager.delete(PostLike, { postId, userId });
+      if (deleted.affected) {
+        await manager.decrement(Post, { id: postId }, 'likeCount', 1);
 
-    return { unliked: true };
+        await this.redisService.set(`post:${postId}:likeCount`, post.likeCount - 1);
+
+        await this.kafka.produce('post.unliked', { postId, userId });
+      }
+      return { unliked: true };
+    });
+  }
+
+  async getLikes(postId: string) {
+    const exists = await this.postRepo.exists({ where: { id: postId } });
+    if (!exists) throw new NotFoundException('Post not found');
+
+    return this.likeRepo.find({ where: { postId }, order: { createdAt: 'ASC' } });
   }
 
   async reply(postId: string, userId: string, dto: CreateReplyDto) {
-    const usernames = extractMentions(dto.content);
-    const mentionUserIds = await this.userReplicaService.resolveMentionsLocally(usernames);
+    return this.dataSource.transaction(async (manager) => {
+      const post = await manager.findOne(Post, { where: { id: postId } });
+      if (!post) throw new NotFoundException('Post not found');
 
-    const reply = this.replyRepo.create({
-      postId,
-      userId,
-      content: dto.content,
-      mediaItems: dto.media || [],
-      mentions: mentionUserIds,
+      const usernames = extractMentions(dto.content);
+      const mentionUserIds = await this.userReplicaService.resolveMentionsLocally(usernames);
+
+      const reply = manager.create(PostReply, { postId, userId, content: dto.content, mediaItems: dto.media || [], mentions: mentionUserIds });
+      const saved = await manager.save(reply);
+
+      await manager.increment(Post, { id: postId }, 'replyCount', 1);
+      await this.redisService.set(`post:${postId}:replyCount`, post.replyCount + 1);
+
+      await this.kafka.produce('post.reply.created', { postId, replyId: saved.id, userId });
+      return saved;
     });
+  }
 
-    const saved = await this.replyRepo.save(reply);
+  async deleteReply(replyId: string, userId: string) {
+    const reply = await this.replyRepo.findOne({ where: { id: replyId } });
+    if (!reply) throw new NotFoundException('Reply not found');
+    if (reply.userId !== userId) throw new ForbiddenException('Cannot delete others reply');
 
-    await this.redisService.incr(`post:${postId}:replies`);
+    return this.dataSource.transaction(async (manager) => {
+      await manager.delete(PostReply, { id: replyId });
+      await manager.decrement(Post, { id: reply.postId }, 'replyCount', 1);
 
-    await this.kafka.produce('post.reply.created', {
-      postId,
-      replyId: saved.id,
-      userId
+      const post = await manager.findOne(Post, { where: { id: reply.postId } });
+      if (post) {
+        // ensure we don't set Redis for a null post
+        await this.redisService.set(`post:${reply.postId}:replyCount`, post.replyCount);
+      }
+
+      await this.kafka.produce('post.reply.deleted', { postId: reply.postId, replyId, userId });
+      return { replyDeleted: true };
     });
-
-    return saved;
   }
 
   async getReplies(postId: string) {
-    const replies = await this.replyRepo.find({
-      where: { postId },
-      order: { createdAt: 'ASC' },
-    });
+    const exists = await this.postRepo.exists({ where: { id: postId } });
+    if (!exists) throw new NotFoundException('Post not found');
 
-    return replies;
+    return this.replyRepo.find({ where: { postId }, order: { createdAt: 'ASC' } });
   }
 }

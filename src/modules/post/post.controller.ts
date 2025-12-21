@@ -56,8 +56,6 @@ export class PostController {
     return this.postService.findById(id);
   }
 
-  //api/posts
-
   @Get()
   @ApiOperation({ summary: 'Get all posts with pagination' })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
@@ -108,6 +106,14 @@ export class PostController {
     return this.postService.unlikePost(id, req.user.sub)
   }
 
+  @Get(':id/likes')
+  @ApiOperation({ summary: 'Get all likes of a post' })
+  @ApiOkResponse({ description: 'List of likes', type: [PostLike] })
+  @ApiNotFoundResponse({ description: 'Post not found' })
+  getLikes(@Param('id') id: string) {
+    return this.postService.getLikes(id)
+  }
+
   @Post(":id/reply")
   @ApiOperation({ summary: 'Reply to a post' })
   @ApiOkResponse({ description: 'Reply created successfully', type: PostReply })
@@ -115,6 +121,14 @@ export class PostController {
   @ApiBadRequestResponse({ description: 'Validation failed' })
   reply(@Param('id') id: string, @Req() req, @Body() dto: CreateReplyDto) {
     return this.postService.reply(id, req.user.sub, dto)
+  }
+
+  @Delete(":id/reply/delete")
+  @ApiOperation({ summary: 'Delete a reply' })
+  @ApiOkResponse({ description: 'Reply successfully deleted' })
+  @ApiNotFoundResponse({ description: 'Post not found' })
+  deleteReply(@Param('replyId') replyId: string, @Req() req) {
+    return this.postService.deleteReply(replyId, req.user.sub)
   }
 
   @Get(':id/replies')

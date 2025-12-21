@@ -14,9 +14,9 @@ export class UserReplicaService {
   ) { }
 
   async onUserCreated(data: UserCreatedDto) {
-    const user = this.repo.create(data);
-    await this.repo.save(user);
-    return user;
+    const exists = await this.repo.exists({ where: { id: data.id } });
+    if (exists) return;
+    await this.repo.insert(data);
   }
 
   async onUserUpdated(data: UserUpdatedDto) {
@@ -41,5 +41,14 @@ export class UserReplicaService {
   async resolveMentionsLocally(usernames: string[]) {
     const users = await this.findManyByUsername(usernames);
     return users.map((user) => user.id);
+  }
+
+  async isEmpty(): Promise<boolean> {
+    const count = await this.repo.count();
+    return count === 0;
+  }
+
+  async bulkInsert(users: UserReplica[]) {
+    await this.repo.save(users);
   }
 }

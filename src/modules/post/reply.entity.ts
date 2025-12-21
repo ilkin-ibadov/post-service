@@ -1,10 +1,21 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, DeleteDateColumn, Unique } from "typeorm";
+import {
+    Entity,
+    PrimaryGeneratedColumn,
+    Column,
+    CreateDateColumn,
+    UpdateDateColumn,
+    DeleteDateColumn,
+    ManyToOne,
+    JoinColumn
+} from "typeorm";
+import { Post } from "./post.entity";
+import { UserReplica } from '../user-replica/user-replica.entity';
 
 export type MediaItemType = Array<{
     mediaId: string;
     url: string;
     type: 'image' | 'video';
-}>
+}>;
 
 @Entity('post_replies')
 export class PostReply {
@@ -18,7 +29,7 @@ export class PostReply {
     userId: string;
 
     @Column('text')
-    content: string
+    content: string;
 
     @Column({ type: 'jsonb', nullable: true })
     mediaItems: MediaItemType;
@@ -27,11 +38,24 @@ export class PostReply {
     mentions: string[];
 
     @CreateDateColumn()
-    createdAt: Date
+    createdAt: Date;
 
     @UpdateDateColumn()
-    updatedAt: Date
+    updatedAt: Date;
 
     @DeleteDateColumn()
-    deletedAt: Date
+    deletedAt: Date;
+
+    // Reply => Post
+    @ManyToOne(() => Post, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'postId' })
+    post: Post;
+
+    // Reply => UserReplica
+    @ManyToOne(() => UserReplica, {
+        eager: false, // IMPORTANT: join only when needed
+        onDelete: 'CASCADE',
+    })
+    @JoinColumn({ name: 'userId' })
+    user: UserReplica;
 }
