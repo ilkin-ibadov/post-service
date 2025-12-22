@@ -28,7 +28,7 @@ export class PostLike {
     // RELATIONS
     // unidirectional relation
     @ManyToOne(() => Post, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'postId' })
+    @JoinColumn({ name: 'postId', referencedColumnName: 'id' })
     post: Post;
 
     // Like => UserReplica
@@ -36,6 +36,6 @@ export class PostLike {
         eager: false, // IMPORTANT: don't auto-join unless requested
         onDelete: 'CASCADE',
     })
-    @JoinColumn({ name: 'userId' })
+    @JoinColumn({ name: 'userId', referencedColumnName: 'id' })
     user: UserReplica;
 }

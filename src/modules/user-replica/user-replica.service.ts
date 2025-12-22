@@ -10,29 +10,32 @@ import { UsernameChangedDto } from './dto/username-changed.dto';
 export class UserReplicaService {
   constructor(
     @InjectRepository(UserReplica)
-    private readonly repo: Repository<UserReplica>,
+    private readonly userReplicaRepo: Repository<UserReplica>,
   ) { }
 
   async onUserCreated(data: UserCreatedDto) {
-    const exists = await this.repo.exists({ where: { id: data.id } });
-    if (exists) return;
-    await this.repo.insert(data);
+    console.log("OnUserCreated: ", this.userReplicaRepo, data)
+    // console.log("User replica payload: ", data)
+    // const exists = await this.repo.findOne({ where: { id: data.id } });
+    // console.log(exists)
+    // if (exists) return;
+    // await this.repo.insert(data);
   }
 
   async onUserUpdated(data: UserUpdatedDto) {
-    await this.repo.update(data.id, data);
+    await this.userReplicaRepo.update(data.id, data);
   }
 
   async onUsernameChanged({ id, newUsername }: UsernameChangedDto) {
-    await this.repo.update(id, { username: newUsername });
+    await this.userReplicaRepo.update(id, { username: newUsername });
   }
 
   async findByUsername(username: string) {
-    return this.repo.findOne({ where: { username } });
+    return this.userReplicaRepo.findOne({ where: { username } });
   }
 
   async findManyByUsername(usernames: string[]) {
-    return this.repo
+    return this.userReplicaRepo
       .createQueryBuilder('u')
       .where('u.username = ANY(:usernames)', { usernames })
       .getMany();
@@ -44,11 +47,11 @@ export class UserReplicaService {
   }
 
   async isEmpty(): Promise<boolean> {
-    const count = await this.repo.count();
+    const count = await this.userReplicaRepo.count();
     return count === 0;
   }
 
   async bulkInsert(users: UserReplica[]) {
-    await this.repo.save(users);
+    await this.userReplicaRepo.save(users);
   }
 }

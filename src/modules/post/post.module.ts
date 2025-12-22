@@ -12,15 +12,16 @@ import { UserReplicaConsumer } from '../kafka/consumers/user-replica.consumer';
 import { RedisService } from '../redis/redis.service';
 import { MongoService } from '../mongo/mongo.service';
 import { IdempotencyModule } from '../kafka/idempotency/idempotency.module';
+import { UserReplicaModule } from '../user-replica/user-replica.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Post, PostLike, PostReply, UserReplica]), IdempotencyModule],
+  imports: [TypeOrmModule.forFeature([Post, PostLike, PostReply, UserReplica]), IdempotencyModule, UserReplicaModule],
   controllers: [PostController],
   providers: [
     PostService,
     KafkaService,
-    UserReplicaService,
-    UserReplicaConsumer,
+    // UserReplicaService,
+    // UserReplicaConsumer,
     RedisService,
     MongoService
   ],

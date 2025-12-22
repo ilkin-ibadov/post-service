@@ -48,7 +48,7 @@ export class PostReply {
 
     // Reply => Post
     @ManyToOne(() => Post, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'postId' })
+    @JoinColumn({ name: 'postId', referencedColumnName: 'id' })
     post: Post;
 
     // Reply => UserReplica
@@ -56,6 +56,6 @@ export class PostReply {
         eager: false, // IMPORTANT: join only when needed
         onDelete: 'CASCADE',
     })
-    @JoinColumn({ name: 'userId' })
+    @JoinColumn({ name: 'userId', referencedColumnName: 'id' })
     user: UserReplica;
 }

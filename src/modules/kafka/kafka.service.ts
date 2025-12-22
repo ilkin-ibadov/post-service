@@ -7,13 +7,15 @@ interface KafkaHandler {
   callback: (payload: any) => Promise<void>;
 }
 
+const topic = 'auth.user.created'
+
 @Injectable()
 export class KafkaService implements OnModuleInit {
   private producer: Producer;
   private consumer: Consumer;
   private handlers: KafkaHandler[] = [];
 
-  constructor(@Inject('KAFKA') private readonly kafka: Kafka) {}
+  constructor(@Inject('KAFKA') private readonly kafka: Kafka) { }
 
   /** Initialize producer and consumer */
   async onModuleInit() {
@@ -26,33 +28,38 @@ export class KafkaService implements OnModuleInit {
     this.consumer = this.kafka.consumer({ groupId: 'posts-service-group' });
     await this.consumer.connect();
     console.log('Post: Kafka consumer connected');
+  }
 
-    // Subscribe all registered handlers
+  async startConsumer() {
     for (const { topic } of this.handlers) {
-      await this.consumer.subscribe({ topic, fromBeginning: false });
+      await this.consumer.subscribe({ topic, fromBeginning: true });
       console.log(`Post: Kafka subscribed to topic: ${topic}`);
     }
 
-    // Run consumer
     await this.consumer.run({
       eachMessage: async ({ topic, message }) => {
+        console.log('Post: Kafka message received', {
+          topic,
+          value: message.value?.toString(),
+        });
+
         if (!message.value) return;
 
         const handlerObj = this.handlers.find(h => h.topic === topic);
-        if (!handlerObj) return;
-
-        try {
-          const parsed = JSON.parse(message.value.toString());
-          await handlerObj.callback(parsed);
-        } catch (err) {
-          console.error(`Post: Kafka message processing error on topic ${topic}`, err);
+        if (!handlerObj) {
+          console.warn(`No handler for topic ${topic}`);
+          return;
         }
+
+        const parsed = JSON.parse(message.value.toString());
+        await handlerObj.callback(parsed);
       },
     });
   }
 
   /** Register a topic handler before consumer runs */
   registerHandler(topic: string, callback: (payload: any) => Promise<void>) {
+    console.log("Post: Kafka register handler called", topic, callback)
     this.handlers.push({ topic, callback });
   }
 

@@ -6,44 +6,56 @@ import { UserReplicaService } from '../../user-replica/user-replica.service';
 @Injectable()
 export class UserReplicaConsumer implements OnModuleInit {
   constructor(
-    private readonly kafka: KafkaService,
+    private readonly kafkaService: KafkaService,
     private readonly idempotency: IdempotencyService,
     private readonly userReplicaService: UserReplicaService,
-  ) {}
+  ) { }
 
-  onModuleInit() {
-    const topics = [
+  async onModuleInit() {
+    this.kafkaService.registerHandler(
       'auth.user.created',
-      'auth.user.updated',
-      'auth.user.username.changed',
+      this.userReplicaService.onUserCreated.bind(this),
+    );
+
+    await this.kafkaService.startConsumer();
+
+    console.log("User replica consumer started")
+    const topics = [
+      'auth.user.created'
     ];
 
     for (const topic of topics) {
-      this.kafka.registerHandler(topic, async (event) => {
+      this.kafkaService.registerHandler('auth.user.created', async (event) => {
         if (!event) return;
 
         const alreadyProcessed = await this.idempotency.isProcessed(
           event.eventId,
-          topic,
+          'auth.user.created',
         );
+
+        console.log("Already processed state: ", alreadyProcessed)
 
         if (alreadyProcessed) return;
 
-        switch (topic) {
-          case 'auth.user.created':
-            await this.userReplicaService.onUserCreated(event.payload);
-            break;
+        const { payload } = event.payload
 
-          case 'auth.user.updated':
-            await this.userReplicaService.onUserUpdated(event.payload);
-            break;
+        await this.userReplicaService.onUserCreated(payload);
 
-          case 'auth.user.username.changed':
-            await this.userReplicaService.onUsernameChanged(event.payload);
-            break;
-        }
+        // switch (topic) {
+        //   case 'auth.user.created':
+        //     await this.userReplicaService.onUserCreated(event.payload);
+        //     break;
 
-        await this.idempotency.markProcessed(event.eventId, topic);
+        //   case 'auth.user.updated':
+        //     await this.userReplicaService.onUserUpdated(event.payload);
+        //     break;
+
+        //   case 'auth.user.username.changed':
+        //     await this.userReplicaService.onUsernameChanged(event.payload);
+        //     break;
+        // }
+
+        await this.idempotency.markProcessed(event.eventId, 'auth.user.created');
       });
     }
   }
